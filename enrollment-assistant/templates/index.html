@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bayanihan College Enrollment Helpdesk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#12232E;--teal:#0E5A6B;--sun:#F4B400;--mist:#EAF0F3;--card:#fff;--muted:#5B6B75;--line:#D3DEE3;--bad:#B3261E}
+@media (prefers-color-scheme:dark){:root{--ink:#E8EEF1;--mist:#0F1C24;--card:#172833;--muted:#93A5AF;--line:#294050;--teal:#5BC0D4}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:"Public Sans",system-ui,sans-serif;background:var(--mist);color:var(--ink);display:flex;flex-direction:column}
+header{background:var(--teal);color:#fff;padding:14px 16px;border-bottom:4px solid var(--sun)}
+@media (prefers-color-scheme:dark){header{background:#0B3D49}}
+header h1{font:700 1.05rem/1.2 Sora,sans-serif;margin:0}
+header p{margin:2px 0 0;font-size:.8rem;opacity:.85}
+#log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;max-width:720px;width:100%;margin:0 auto}
+.msg{max-width:85%;padding:10px 14px;border-radius:16px;line-height:1.45;font-size:.95rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.user{align-self:flex-end;background:var(--teal);color:#fff;border-bottom-right-radius:4px}
+.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px}
+.err{border-color:var(--bad);color:var(--bad)}
+.meta{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.75rem;color:var(--muted)}
+.meta button{background:none;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:.95rem;cursor:pointer;color:inherit;min-height:32px}
+.meta button[aria-pressed=true]{background:var(--sun);border-color:var(--sun);color:#12232E}
+.dots{display:inline-flex;gap:4px}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:b 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{opacity:.3}40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.dots i{animation:none}}
+form{display:flex;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);max-width:720px;width:100%;margin:0 auto}
+input{flex:1;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font:inherit;background:var(--mist);color:var(--ink)}
+button.send{padding:0 18px;border:0;border-radius:12px;background:var(--sun);color:#12232E;font:600 .95rem "Public Sans",sans-serif;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Bayanihan College Enrollment Helpdesk</h1>
+  <p>Ask in English, Filipino, or Taglish. Answers come from the official FAQ only.</p>
+</header>
+<main id="log" aria-live="polite">
+  <div class="msg bot">Hi! I can help with requirements, schedules, payment, scholarships, and registrar services. / Kumusta! Ano po ang gusto ninyong itanong?</div>
+</main>
+<form id="f" autocomplete="off">
+  <input id="m" maxlength="500" placeholder="Type your question" aria-label="Your question" required>
+  <button class="send" id="s">Send</button>
+</form>
+<script>
+const log=document.getElementById('log'),f=document.getElementById('f'),m=document.getElementById('m'),s=document.getElementById('s');
+function add(text,cls){const d=document.createElement('div');d.className='msg '+cls;d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+function rate(btn,logId,val,wrap){
+  fetch('/api/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({log_id:logId,rating:val})});
+  wrap.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===btn));
+}
+f.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const text=m.value.trim();if(!text)return;
+  add(text,'user');m.value='';s.disabled=true;
+  const load=add('','bot');load.innerHTML='<span class="dots" role="status" aria-label="Loading"><i></i><i></i><i></i></span>';
+  try{
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});
+    const d=await r.json();
+    if(!r.ok){load.textContent=d.error||'Something went wrong.';load.classList.add('err')}
+    else{
+      load.textContent=d.answer;
+      const meta=document.createElement('div');meta.className='meta';
+      const src=document.createElement('span');
+      src.textContent=d.faq_ids.length?'FAQ ids: '+d.faq_ids.join(', '):'No FAQ match';
+      meta.appendChild(src);
+      [['up','👍','Helpful'],['down','👎','Not helpful']].forEach(([v,icon,label])=>{
+        const b=document.createElement('button');b.type='button';b.textContent=icon;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed','false');
+        b.onclick=()=>rate(b,d.log_id,v,meta);meta.appendChild(b);
+      });
+      load.appendChild(meta);
+    }
+  }catch(err){load.textContent='Could not reach the server. Check your connection and try again.';load.classList.add('err')}
+  s.disabled=false;m.focus();log.scrollTop=log.scrollHeight;
+});
+</script>
+</body>
+</html>

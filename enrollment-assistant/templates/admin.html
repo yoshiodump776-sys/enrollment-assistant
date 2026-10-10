@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin: Enrollment Helpdesk</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#EAF0F3;color:#12232E;margin:0;padding:20px;max-width:640px;margin-inline:auto}
+h1{font-size:1.2rem;margin:0 0 16px}
+.card{background:#fff;border:1px solid #D3DEE3;border-radius:12px;padding:16px;margin-bottom:14px}
+.big{font-size:2rem;font-weight:700}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:.9rem}
+.row span:first-child{width:110px}
+.bar{height:14px;background:#0E5A6B;border-radius:4px;min-width:2px}
+a{color:#0E5A6B}
+</style>
+</head>
+<body>
+<h1>Helpdesk stats</h1>
+<div class="card"><div>Thumbs up</div><div class="big" id="pct">-</div><div id="rated" style="color:#5B6B75;font-size:.85rem"></div></div>
+<div class="card"><div style="margin-bottom:8px">Questions per category (<span id="total">0</span> total)</div><div id="cats"></div></div>
+<p><a href="/">Back to chat</a></p>
+<script>
+async function load(){
+  const d=await (await fetch('/api/stats')).json();
+  document.getElementById('pct').textContent=d.thumbs_up_pct==null?'No ratings yet':d.thumbs_up_pct+'%';
+  document.getElementById('rated').textContent=d.rated+' rated replies';
+  document.getElementById('total').textContent=d.total;
+  const max=Math.max(1,...Object.values(d.per_category));
+  const c=document.getElementById('cats');c.innerHTML='';
+  Object.entries(d.per_category).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+    const r=document.createElement('div');r.className='row';
+    r.innerHTML='<span></span><div class="bar" style="width:'+(v/max*60)+'%"></div><span>'+v+'</span>';
+    r.firstChild.textContent=k;c.appendChild(r);
+  });
+  if(!d.total)c.textContent='No questions yet. Ask something in the chat.';
+}
+load();setInterval(load,5000);
+</script>
+</body>
+</html>
